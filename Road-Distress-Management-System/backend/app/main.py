@@ -146,6 +146,7 @@ def startup_event() -> None:
         from app.models.video import UploadedVideo
         from app.models.distress import RoadDistress
         from app.models.user import User
+        from app.core.security import get_password_hash
         from datetime import datetime
 
         # Seed admin user
@@ -155,13 +156,19 @@ def startup_event() -> None:
                 id=1,
                 email="admin@roaddistress.org",
                 full_name="Monitoring Engineer (ME)",
-                hashed_password="hashed_placeholder_admin",
+                hashed_password=get_password_hash("AdminSecurePassword123!"),
                 role="admin"
             )
             db.add(admin_user)
             db.commit()
         else:
             admin_user.full_name = "Monitoring Engineer (ME)"
+            # Self-healing: earlier versions of this seed wrote a literal
+            # placeholder string instead of a real password hash, silently
+            # locking the documented admin login out of every fresh deploy
+            # that already ran this once. Repair it in place if found.
+            if admin_user.hashed_password == "hashed_placeholder_admin":
+                admin_user.hashed_password = get_password_hash("AdminSecurePassword123!")
             db.commit()
 
         video_20 = db.query(UploadedVideo).filter(UploadedVideo.id == 20).first()
