@@ -7,7 +7,7 @@ FROM ghcr.io/cirruslabs/flutter:stable AS build
 # release (e.g. it shipped Flutter 3.44.0 / Dart 3.12.0 while pubspec.yaml
 # requires Dart ^3.12.2) -- upgrading at build time rather than pinning a
 # tag keeps this working as pubspec.yaml's constraint moves forward.
-RUN flutter upgrade
+RUN flutter channel stable && flutter upgrade
 
 WORKDIR /app
 COPY . .
