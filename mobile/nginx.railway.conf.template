@@ -1,0 +1,18 @@
+# Templated by nginx:alpine's docker-entrypoint (envsubst on
+# /etc/nginx/templates/*.template) so ${PORT} resolves to Railway's dynamic
+# port at container start. Only ${PORT} is substituted -- nginx's own
+# runtime variables ($uri, $host, etc. -- no braces, different names) are
+# untouched.
+server {
+    listen ${PORT};
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA fallback so go_router deep links (e.g. /video-review/4) survive a
+    # hard refresh instead of 404ing.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -38,4 +38,8 @@ COPY . .
 RUN mkdir -p uploads ../reports
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Shell form (not exec-form array) so $PORT expands -- Railway injects a
+# dynamic PORT at runtime and expects the process to bind to it; falls back
+# to 8000 for docker-compose/local runs where PORT is unset.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}

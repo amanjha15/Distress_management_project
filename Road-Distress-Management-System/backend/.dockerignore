@@ -4,7 +4,6 @@ __pycache__
 *.pyc
 uploads/
 reports/
-models/
 .pytest_cache
 .git
 *.log
