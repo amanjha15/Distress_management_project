@@ -2,6 +2,13 @@
 # then serves it with nginx on Railway's dynamic $PORT.
 
 FROM ghcr.io/cirruslabs/flutter:stable AS build
+
+# The cirruslabs image's "stable" tag can lag behind the latest patch
+# release (e.g. it shipped Flutter 3.44.0 / Dart 3.12.0 while pubspec.yaml
+# requires Dart ^3.12.2) -- upgrading at build time rather than pinning a
+# tag keeps this working as pubspec.yaml's constraint moves forward.
+RUN flutter upgrade
+
 WORKDIR /app
 COPY . .
 
