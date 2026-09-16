@@ -1,13 +1,26 @@
 # Railway build for the Flutter web frontend. Builds the static web app,
 # then serves it with nginx on Railway's dynamic $PORT.
 
-FROM ghcr.io/cirruslabs/flutter:stable AS build
+FROM debian:bookworm-slim AS build
 
-# The cirruslabs image's "stable" tag can lag behind the latest patch
-# release (e.g. it shipped Flutter 3.44.0 / Dart 3.12.0 while pubspec.yaml
-# requires Dart ^3.12.2) -- upgrading at build time rather than pinning a
-# tag keeps this working as pubspec.yaml's constraint moves forward.
-RUN flutter channel stable && flutter upgrade
+# The ghcr.io/cirruslabs/flutter:stable image's checkout lags patch
+# releases (shipped Dart 3.12.0 while pubspec.yaml requires ^3.12.2) and
+# its git checkout is too shallow for `flutter channel`/`flutter upgrade`
+# to fix in-place. Installing a pinned SDK straight from Flutter's own
+# archive sidesteps both problems -- 3.44.6 is the first stable release
+# bundling Dart 3.12.2.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates xz-utils git \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV FLUTTER_VERSION=3.44.6
+RUN curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz" -o /tmp/flutter.tar.xz \
+    && tar -xf /tmp/flutter.tar.xz -C /opt \
+    && rm /tmp/flutter.tar.xz
+ENV PATH="/opt/flutter/bin:${PATH}"
+RUN git config --global --add safe.directory /opt/flutter \
+    && flutter config --no-analytics \
+    && flutter precache --web
 
 WORKDIR /app
 COPY . .
