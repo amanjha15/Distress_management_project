@@ -85,6 +85,7 @@ class LiveStatus {
     required this.avgConfidence,
     required this.fps,
     required this.inferenceFps,
+    this.videoId,
   });
 
   final bool running;
@@ -100,6 +101,12 @@ class LiveStatus {
   final double fps;
   final double? inferenceFps;
 
+  /// The synthetic UploadedVideo record id created for this live session
+  /// (see LiveCameraManager._start_session_video_record on the backend) --
+  /// pass this to RoadDistressApi.generatePdfReport once the session
+  /// stops, to get a report of exactly this session's detections.
+  final int? videoId;
+
   factory LiveStatus.fromJson(Map<String, dynamic> json) {
     return LiveStatus(
       running: json['running'] as bool? ?? false,
@@ -114,6 +121,7 @@ class LiveStatus {
       avgConfidence: (json['avg_confidence'] as num?)?.toDouble() ?? 0,
       fps: (json['fps'] as num?)?.toDouble() ?? 0,
       inferenceFps: (json['inference_fps'] as num?)?.toDouble(),
+      videoId: (json['video_id'] as num?)?.toInt(),
     );
   }
 }
@@ -209,12 +217,20 @@ class LiveDetectionApi {
     }
   }
 
-  Future<void> stop() async {
+  /// Returns the stopped session's video_id (for generating a report of
+  /// just this session -- see LiveStatus.videoId), or null if the request
+  /// failed or the backend didn't return one.
+  Future<int?> stop() async {
     try {
-      await _client.post(Uri.parse('$kApiV1/live/stop'));
+      final response = await _client.post(Uri.parse('$kApiV1/live/stop'));
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        return (body['video_id'] as num?)?.toInt();
+      }
     } catch (_) {
       // Matches the React source's fire-and-forget `catch { /* noop */ }`.
     }
+    return null;
   }
 
   /// Returns null on any failure (offline backend, network error, etc.) —

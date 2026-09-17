@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../data/live_detection_api.dart';
+import '../../data/road_distress_api.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/local_time.dart';
 import 'widgets/mjpeg_view.dart';
@@ -32,11 +33,14 @@ class LiveDetectionScreen extends StatefulWidget {
 
 class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
   final _api = LiveDetectionApi();
+  final _reportApi = RoadDistressApi();
   final _cameraIndexController = TextEditingController(text: '1');
 
   bool _running = false;
   bool _starting = false;
+  bool _generatingReport = false;
   LiveStatus? _status;
+  int? _lastSessionVideoId;
   final List<LiveEvent> _events = [];
   String? _error;
   int _streamKey = 0;
@@ -188,11 +192,12 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
     // The backend already stops itself when the phone-stream socket closes
     // (see the WS handler's `finally`), but this is idempotent and cheap —
     // cheaper to call it than to trust two independent shutdown paths agree.
-    await _api.stop();
+    final videoId = await _api.stop();
     if (!mounted) return;
     setState(() {
       _running = false;
       _overlayEvent = null;
+      _lastSessionVideoId = videoId ?? _lastSessionVideoId;
     });
   }
 
@@ -201,12 +206,34 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
       await _stopThisDeviceCamera();
       return;
     }
-    await _api.stop();
+    final videoId = await _api.stop();
     _wsSubscription?.cancel();
     _wsChannel?.sink.close();
     _wsChannel = null;
     if (!mounted) return;
-    setState(() => _running = false);
+    setState(() {
+      _running = false;
+      _lastSessionVideoId = videoId ?? _lastSessionVideoId;
+    });
+  }
+
+  /// Generates a PDF report scoped to just-ended live session's detections
+  /// -- reuses the existing video-based report endpoint unchanged, since
+  /// the backend tags this session's detections with a synthetic video_id
+  /// (see LiveCameraManager._start_session_video_record).
+  Future<void> _handleGenerateReport() async {
+    final videoId = _lastSessionVideoId;
+    if (videoId == null || _generatingReport) return;
+    setState(() => _generatingReport = true);
+    String message = 'PDF report generated for this live session! Check Reports section.';
+    try {
+      await _reportApi.generatePdfReport(videoId);
+    } catch (_) {
+      message = 'Failed to generate report for this live session. Please try again.';
+    }
+    if (!mounted) return;
+    setState(() => _generatingReport = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _connectWs() {
@@ -312,6 +339,9 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
       cameraController: _cameraController,
       overlayEvent: _overlayEvent,
       onStartThisDeviceCamera: _startThisDeviceCamera,
+      hasSessionReport: _lastSessionVideoId != null,
+      generatingReport: _generatingReport,
+      onGenerateReport: _handleGenerateReport,
     );
 
     // This screen is embedded as DashboardShell's `child` (which already
@@ -554,6 +584,9 @@ class _CameraFeedCard extends StatelessWidget {
     required this.cameraController,
     required this.overlayEvent,
     required this.onStartThisDeviceCamera,
+    required this.hasSessionReport,
+    required this.generatingReport,
+    required this.onGenerateReport,
   });
 
   final bool running;
@@ -571,6 +604,12 @@ class _CameraFeedCard extends StatelessWidget {
   final CameraController? cameraController;
   final LiveEvent? overlayEvent;
   final VoidCallback onStartThisDeviceCamera;
+
+  /// True once a live session has stopped and left a report-able record
+  /// behind (LiveStatus.videoId from the stop response).
+  final bool hasSessionReport;
+  final bool generatingReport;
+  final VoidCallback onGenerateReport;
 
   @override
   Widget build(BuildContext context) {
@@ -691,6 +730,14 @@ class _CameraFeedCard extends StatelessWidget {
                   icon: LucideIcons.square,
                   color: AppColors.danger,
                   onTap: onStop,
+                ),
+              if (!running && hasSessionReport)
+                _SolidButton(
+                  label: generatingReport ? 'Generating Report...' : 'Generate Session Report',
+                  icon: generatingReport ? null : LucideIcons.fileText,
+                  loading: generatingReport,
+                  color: AppColors.accentBlue,
+                  onTap: generatingReport ? null : onGenerateReport,
                 ),
               if (error != null)
                 Text(

@@ -186,6 +186,7 @@ class LiveCameraManager:
         self._ensure_models_loaded()
         self._reset_session_state("remote_stream", latitude, longitude)
         self.stats["camera_index"] = None
+        self._start_session_video_record("remote_stream")
 
         self._running.set()
         self._inference_thread = threading.Thread(
@@ -246,6 +247,7 @@ class LiveCameraManager:
         self._raw_frame_count = 0
         self._latest_road_detections = []
         self._latest_sign_detections = []
+        self._start_session_video_record("usb_camera")
 
         self._running.set()
 
@@ -275,6 +277,7 @@ class LiveCameraManager:
             self._inference_thread.join(timeout=3.0)
             self._inference_thread = None
 
+        self._finish_session_video_record()
         logger.info("Live camera stopped")
         return {"status": "stopped", **self.status()}
 
@@ -322,7 +325,58 @@ class LiveCameraManager:
             "detections_total": 0, "detections_road": 0, "detections_sign": 0,
             "critical_alerts": 0, "persisted": 0,
             "avg_confidence": 0.0, "fps": 0.0, "inference_fps": 0.0, "started_at": None,
+            "video_id": None,
         }
+
+    def _start_session_video_record(self, source: str) -> None:
+        """Creates a lightweight UploadedVideo row representing this live
+        session -- no real video file backs it, it exists purely so
+        _maybe_persist can tag this session's detections with a video_id,
+        letting the existing POST /reports/generate/{video_id} endpoint
+        (and pdf_generator.py, which only ever queries by video_id and
+        reads video.filename/.processing_status, never the file itself)
+        generate a report for a live session unchanged."""
+        try:
+            from app.db.session import SessionLocal
+            from app.models.video import UploadedVideo
+
+            db = SessionLocal()
+            try:
+                started_at = datetime.now(timezone.utc)
+                video = UploadedVideo(
+                    filename=f"Live Session {started_at.strftime('%Y-%m-%d %H:%M:%S')} UTC ({source})",
+                    processing_status="processing",
+                    processing_started_at=started_at,
+                )
+                db.add(video)
+                db.commit()
+                db.refresh(video)
+                with self._lock:
+                    self.stats["video_id"] = video.id
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Could not create session video record for live report generation: {e}")
+
+    def _finish_session_video_record(self) -> None:
+        video_id = self.stats.get("video_id")
+        if not video_id:
+            return
+        try:
+            from app.db.session import SessionLocal
+            from app.models.video import UploadedVideo
+
+            db = SessionLocal()
+            try:
+                video = db.query(UploadedVideo).filter(UploadedVideo.id == video_id).first()
+                if video:
+                    video.processing_status = "completed"
+                    video.processing_completed_at = datetime.now(timezone.utc)
+                    db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"Could not finalize session video record {video_id}: {e}")
 
     def _capture_loop(self, camera_index: int) -> None:
         backend_flag = cv2.CAP_DSHOW if os.name == "nt" else cv2.CAP_ANY
@@ -522,6 +576,7 @@ class LiveCameraManager:
                     source_type="live",
                     detection_image_path=rel_path,
                     model_source=det["model_source"],
+                    video_id=self.stats.get("video_id"),
                 )
                 db.add(row)
                 db.commit()
