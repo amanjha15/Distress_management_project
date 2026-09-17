@@ -25,25 +25,37 @@ _ffmpeg_path_configured = False
 
 def _ensure_ffmpeg_on_path() -> None:
     """Whisper shells out to a program literally named `ffmpeg` (`ffmpeg.exe`
-    on Windows) to decode audio. imageio-ffmpeg (already a dependency for
-    video processing) bundles a portable binary, but under a versioned
-    filename like `ffmpeg-win-x86_64-v7.1.exe` -- putting its directory on
-    PATH isn't enough, since Windows won't resolve the bare "ffmpeg" command
-    to a differently-named file. Copy it once to a plain `ffmpeg.exe` in a
-    directory we control and PATH that instead."""
+    on Windows, plain `ffmpeg` on Linux/macOS) to decode audio.
+    imageio-ffmpeg (already a dependency for video processing) bundles a
+    portable binary, but under a versioned filename like
+    `ffmpeg-win-x86_64-v7.1.exe` -- putting its directory on PATH isn't
+    enough, since neither OS resolves the bare "ffmpeg" command to a
+    differently-named file. Copy it once to a plain `ffmpeg`/`ffmpeg.exe` in
+    a directory we control and PATH that instead. The original code only
+    ever wrote the `.exe` name, so this silently never worked on Linux
+    (Railway, docker-compose) -- whisper's subprocess call to "ffmpeg"
+    would find nothing and fail every transcription."""
     global _ffmpeg_path_configured
     if _ffmpeg_path_configured:
         return
     try:
         import shutil
+        import sys
+        import stat
         import imageio_ffmpeg
 
         bin_dir = os.path.join(os.path.dirname(__file__), "..", "..", ".cache", "ffmpeg_bin")
         bin_dir = os.path.abspath(bin_dir)
         os.makedirs(bin_dir, exist_ok=True)
-        aliased_exe = os.path.join(bin_dir, "ffmpeg.exe")
+        alias_name = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+        aliased_exe = os.path.join(bin_dir, alias_name)
         if not os.path.exists(aliased_exe):
             shutil.copy2(imageio_ffmpeg.get_ffmpeg_exe(), aliased_exe)
+        if sys.platform != "win32":
+            # shutil.copy2 preserves the source's mode bits, which should
+            # already be executable, but make it explicit rather than rely
+            # on that -- a non-executable ffmpeg is as useless as a missing one.
+            os.chmod(aliased_exe, os.stat(aliased_exe).st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
         if bin_dir not in os.environ.get("PATH", ""):
             os.environ["PATH"] = bin_dir + os.pathsep + os.environ.get("PATH", "")
     except Exception as e:
