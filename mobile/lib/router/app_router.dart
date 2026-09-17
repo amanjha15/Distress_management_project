@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/auth_provider.dart';
+import '../screens/audit/audit_detail_screen.dart';
+import '../screens/audit/audit_list_screen.dart';
 import '../screens/dashboard/dashboard_shell.dart';
 import '../screens/dashboard/overview_screen.dart';
 import '../screens/dashboard_grid/dashboard_grid_screen.dart';
@@ -14,6 +16,8 @@ import '../screens/analytics/analytics_screen.dart';
 import '../screens/history/history_screen.dart';
 import '../screens/maintenance/maintenance_screen.dart';
 import '../screens/notifications/notifications_screen.dart';
+import '../screens/projects/module_chooser_screen.dart';
+import '../screens/projects/project_list_screen.dart';
 import '../screens/reports/reports_screen.dart';
 import '../screens/road_distresses/road_distresses_screen.dart';
 import '../screens/survey/survey_screen.dart';
@@ -22,10 +26,13 @@ import '../screens/video_review/video_review_screen.dart';
 
 /// Route paths mirror Road-Distress-Management-System/frontend/src/routes/AppRoutes.tsx
 /// 1:1, so links and navigation logic stay recognizable across both apps.
+/// `/projects` and `/projects/:id/modules` are new: the project-picker and
+/// module-chooser homepage that now sits between login and the M1 survey flow.
 class AppRoutes {
   AppRoutes._();
 
   static const login = '/login';
+  static const projects = '/projects';
   static const survey = '/survey';
   static const dashboard = '/dashboard';
   static const overview = '/overview';
@@ -40,6 +47,10 @@ class AppRoutes {
   static const history = '/history';
   static const notifications = '/notifications';
   static const videoReview = '/video-review';
+
+  static String projectModules(int projectId) => '/projects/$projectId/modules';
+  static String auditList(int projectId) => '/projects/$projectId/audits';
+  static String auditDetail(int projectId, int auditId) => '/projects/$projectId/audits/$auditId';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -47,17 +58,42 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: AppRoutes.login,
     refreshListenable: _AuthListenable(ref),
     redirect: (context, state) {
-      final isAuthenticated = ref.read(authProvider).isAuthenticated;
+      final authState = ref.read(authProvider);
+      if (authState.isRestoring) return null;
+
+      final isAuthenticated = authState.isAuthenticated;
       final onLoginPage = state.matchedLocation == AppRoutes.login;
 
       if (!isAuthenticated && !onLoginPage) return AppRoutes.login;
-      if (isAuthenticated && onLoginPage) return AppRoutes.survey;
+      if (isAuthenticated && onLoginPage) return AppRoutes.projects;
       return null;
     },
     routes: [
       GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.projects,
+        builder: (context, state) => const ProjectListScreen(),
+      ),
+      GoRoute(
+        path: '${AppRoutes.projects}/:id/modules',
+        builder: (context, state) => ModuleChooserScreen(
+          projectId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '${AppRoutes.projects}/:id/audits',
+        builder: (context, state) => AuditListScreen(
+          projectId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '${AppRoutes.projects}/:id/audits/:auditId',
+        builder: (context, state) => AuditDetailScreen(
+          auditId: int.tryParse(state.pathParameters['auditId'] ?? '') ?? 0,
+        ),
       ),
       GoRoute(
         path: AppRoutes.survey,
@@ -132,7 +168,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 class _AuthListenable extends ChangeNotifier {
   _AuthListenable(this.ref) {
     ref.listen(authProvider, (previous, next) {
-      if (previous?.isAuthenticated != next.isAuthenticated) {
+      if (previous?.isAuthenticated != next.isAuthenticated ||
+          previous?.isRestoring != next.isRestoring) {
         notifyListeners();
       }
     });

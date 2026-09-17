@@ -7,6 +7,9 @@ from app.models.distress import RoadDistress
 from app.models.video import UploadedVideo
 from app.models.maintenance import MaintenanceTask
 from app.models.report import Report
+from app.models.project import Project, ProjectMember
+from app.models.auth import OtpCode, AuthToken
+from app.models.audit import SafetyAudit, AuditChecklistItem, AuditAudioClip
 
 __all__ = [
     "User",
@@ -14,4 +17,11 @@ __all__ = [
     "UploadedVideo",
     "MaintenanceTask",
     "Report",
+    "Project",
+    "ProjectMember",
+    "OtpCode",
+    "AuthToken",
+    "SafetyAudit",
+    "AuditChecklistItem",
+    "AuditAudioClip",
 ]
