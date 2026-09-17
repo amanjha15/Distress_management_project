@@ -19,6 +19,7 @@ from app.api.v1.routes import (
     live,
     projects,
     audits,
+    assets,
 )
 
 # Initialize FastAPI application
@@ -279,6 +280,7 @@ api_router.include_router(detection.router, prefix="/detection", tags=["AI Distr
 api_router.include_router(live.router, prefix="/live", tags=["Live Camera Detection"])
 api_router.include_router(projects.router, prefix="/projects", tags=["Projects (Module Platform)"])
 api_router.include_router(audits.router, prefix="/audits", tags=["M2 Road Safety Audit"])
+api_router.include_router(assets.router, prefix="/assets", tags=["M3 Asset Management"])
 
 # Bind centralized API version 1 router to application
 app.include_router(api_router, prefix=settings.API_V1_STR)

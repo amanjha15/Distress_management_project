@@ -10,6 +10,7 @@ from app.models.report import Report
 from app.models.project import Project, ProjectMember
 from app.models.auth import OtpCode, AuthToken
 from app.models.audit import SafetyAudit, AuditChecklistItem, AuditAudioClip
+from app.models.asset import ProjectAsset
 
 __all__ = [
     "User",
@@ -24,4 +25,5 @@ __all__ = [
     "SafetyAudit",
     "AuditChecklistItem",
     "AuditAudioClip",
+    "ProjectAsset",
 ]
