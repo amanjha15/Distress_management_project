@@ -113,5 +113,8 @@ class InspectionsTable extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+  String _formatDate(DateTime d) {
+    final local = d.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
 }

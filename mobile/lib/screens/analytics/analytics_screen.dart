@@ -28,8 +28,15 @@ const _kShortMonths = [
 
 String _shortDate(DateTime d) => '${_kShortMonths[d.month - 1]} ${d.day}';
 String _monthYear(DateTime d) => '${_kShortMonths[d.month - 1]} ${(d.year % 100).toString().padLeft(2, '0')}';
-String _dateIN(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-String _isoDay(DateTime d) => d.toIso8601String().split('T').first;
+// .toLocal() matters here: these DateTimes may be UTC-aware (parsed from a
+// backend timestamp with a +00:00 suffix) -- without converting first,
+// _isoDay buckets events by their UTC calendar day instead of the viewer's,
+// which visibly mis-files anything near a local midnight.
+String _dateIN(DateTime d) {
+  final local = d.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+}
+String _isoDay(DateTime d) => d.toLocal().toIso8601String().split('T').first;
 String _capitalizeFirst(String s) => s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 String _titleCaseWords(String s) =>
     s.split(' ').map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1)).join(' ');

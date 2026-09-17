@@ -6,7 +6,7 @@ maintenance recommendations, safety PDF report compilation, and alerting.
 
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
@@ -52,7 +52,7 @@ def process_video(video_id: int) -> None:
         # 1. Transition video status to processing (Stage: Extracting Frames, Progress: 10%)
         video_update = UploadedVideoUpdate(
             processing_status="processing",
-            processing_started_at=datetime.utcnow(),
+            processing_started_at=datetime.now(timezone.utc),
             progress=10,
             processing_stage="Extracting Frames"
         )
@@ -160,7 +160,7 @@ def process_video(video_id: int) -> None:
             # Set video processing status to completed (Stage: Finalizing Inspection, Progress: 95%)
             video_update = UploadedVideoUpdate(
                 processing_status="completed",
-                processing_completed_at=datetime.utcnow(),
+                processing_completed_at=datetime.now(timezone.utc),
                 progress=95,
                 processing_stage="Finalizing Inspection"
             )
@@ -216,7 +216,7 @@ def process_video(video_id: int) -> None:
         try:
             video_update = UploadedVideoUpdate(
                 processing_status="failed",
-                processing_completed_at=datetime.utcnow(),
+                processing_completed_at=datetime.now(timezone.utc),
                 processing_duration=duration,
                 progress=0,
                 processing_stage=f"Failed: {str(e)[:80]}"

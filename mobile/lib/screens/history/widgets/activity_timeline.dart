@@ -85,10 +85,14 @@ Widget statusPill(String status) {
 }
 
 String formatDateTimeIN(DateTime d) {
-  final hour = d.hour % 12 == 0 ? 12 : d.hour % 12;
-  final ampm = d.hour >= 12 ? 'PM' : 'AM';
-  return '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}, '
-      '${hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} $ampm';
+  // .toLocal() is a no-op if d is already local; required when d came from
+  // parsing a UTC-aware backend timestamp (e.g. "...+00:00"), otherwise this
+  // prints the UTC wall-clock time as if it were the viewer's local time.
+  final local = d.toLocal();
+  final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
+  final ampm = local.hour >= 12 ? 'PM' : 'AM';
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}, '
+      '${hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')} $ampm';
 }
 
 /// Direct port of History.tsx's "Activity Timeline" (left, 70% column):

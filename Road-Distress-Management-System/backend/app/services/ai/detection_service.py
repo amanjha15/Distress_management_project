@@ -5,7 +5,7 @@ Triggers frame extraction, runs inference, and writes detected anomaly logs to t
 
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.db.session import SessionLocal
 from app.crud.video import update_video
@@ -38,7 +38,7 @@ def process_video_pipeline(video_id: int) -> None:
         # 1. Update video record status to 'processing'
         video_update = UploadedVideoUpdate(
             processing_status="processing",
-            processing_started_at=datetime.utcnow()
+            processing_started_at=datetime.now(timezone.utc)
         )
         db_video = update_video(db, video_id=video_id, video_in=video_update)
         if not db_video:
@@ -80,7 +80,7 @@ def process_video_pipeline(video_id: int) -> None:
         duration = round(time.time() - start_time, 2)
         video_update = UploadedVideoUpdate(
             processing_status="completed",
-            processing_completed_at=datetime.utcnow(),
+            processing_completed_at=datetime.now(timezone.utc),
             processing_duration=duration
         )
         update_video(db, video_id=video_id, video_in=video_update)
@@ -97,7 +97,7 @@ def process_video_pipeline(video_id: int) -> None:
         try:
             video_update = UploadedVideoUpdate(
                 processing_status="failed",
-                processing_completed_at=datetime.utcnow(),
+                processing_completed_at=datetime.now(timezone.utc),
                 processing_duration=duration
             )
             update_video(db, video_id=video_id, video_in=video_update)

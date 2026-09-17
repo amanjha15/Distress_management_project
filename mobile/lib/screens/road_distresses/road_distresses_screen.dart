@@ -165,8 +165,10 @@ class _RoadDistressesScreenState extends State<RoadDistressesScreen> {
     );
   }
 
-  String _dateOnly(DateTime dt) =>
-      '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  String _dateOnly(DateTime dt) {
+    final local = dt.toLocal();
+    return '${local.year.toString().padLeft(4, '0')}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
 
   List<DistressRecord> get _filtered {
     final query = _searchQuery.toLowerCase().trim();
