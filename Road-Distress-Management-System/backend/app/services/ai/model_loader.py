@@ -206,12 +206,31 @@ class ModelLoader:
             cls._instance = super(ModelLoader, cls).__new__(cls)
         return cls._instance
 
+    def unload(self) -> None:
+        """Release the loaded models so their memory can be reused -- see
+        the matching call in LiveCameraManager._ensure_models_loaded()."""
+        self._road_model = None
+        self._signage_model = None
+
+    def _unload_live_pipeline_if_idle(self) -> None:
+        # The live-camera pipeline loads its own separate copies of these
+        # same two checkpoints at 256x256 vs this pipeline's 640x640.
+        # Release them first so both aren't resident at once -- but only if
+        # no live session is actively running, so an in-progress live feed
+        # isn't forced to reload mid-session.
+        from app.services.live.live_camera_service import LiveCameraManager
+        live_manager = LiveCameraManager.instance()
+        if not live_manager.is_running():
+            live_manager.unload_models()
+
     def load_road_model(self) -> Any:
         """
         Lazy loads the road distress detection model (YOLOX-M, 4 classes) using YOLOXDetector.
         """
         if self._road_model is not None:
             return self._road_model
+
+        self._unload_live_pipeline_if_idle()
 
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         # Loaded via YOLOXDetector -> torch.load() below, which is extension-
@@ -261,6 +280,8 @@ class ModelLoader:
         """
         if self._signage_model is not None:
             return self._signage_model
+
+        self._unload_live_pipeline_if_idle()
 
         base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
         # See load_road_model() above: extension-agnostic loading via

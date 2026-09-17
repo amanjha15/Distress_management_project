@@ -105,6 +105,18 @@ class LiveCameraManager:
     def _ensure_models_loaded(self) -> None:
         """Lazy-loads both YOLOX models on first start (local or remote)."""
         from app.services.live.yolox_engine import YOLOXDetector
+
+        if self._pavement is None or self._signage is None:
+            # The video-upload pipeline (app/services/ai/model_loader.py)
+            # loads its own separate copies of these same two checkpoints at
+            # 640x640 vs this pipeline's 256x256. Having both loaded at once
+            # roughly doubles this process's resident memory -- enough to
+            # trigger OOM kills on memory-constrained hosts. Release that
+            # pipeline's models first; they'll lazily reload (at a one-time
+            # latency cost) the next time a video is processed.
+            from app.services.ai.model_loader import ModelLoader
+            ModelLoader().unload()
+
         if self._pavement is None:
             self._pavement = YOLOXDetector(
                 cfg.PAVEMENT_EXP_FILE, cfg.PAVEMENT_CKPT, "road",
@@ -275,6 +287,18 @@ class LiveCameraManager:
 
     def is_running(self) -> bool:
         return self._running.is_set()
+
+    def unload_models(self) -> None:
+        """Release the loaded YOLOX detectors so their memory can be
+        reused. Safe to call even mid-session: any in-flight inference
+        loop already holds its own reference to these objects (Python is
+        reference-counted), so this only affects the *next* load -- it
+        will lazily reload on the next start()/start_remote() call. See
+        the matching call in ModelLoader.load_road_model()."""
+        self._pavement = None
+        self._signage = None
+        self._pavement_info = None
+        self._signage_info = None
 
     def status(self) -> Dict[str, Any]:
         with self._lock:
