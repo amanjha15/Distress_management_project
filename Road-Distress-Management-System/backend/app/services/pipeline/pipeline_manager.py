@@ -14,7 +14,7 @@ from app.crud.video import update_video, get_video
 from app.schemas.video import UploadedVideoUpdate
 from app.crud.distress import create_distress
 from app.schemas.distress import RoadDistressCreate
-from app.services.ai.frame_extractor import extract_frames
+from app.services.ai.frame_extractor import iter_frames, get_frame_count
 from app.services.ai.inference_service import run_inference
 from app.services.ai.utils import generate_gps_coordinates
 
@@ -59,14 +59,20 @@ def process_video(video_id: int) -> None:
         update_video(db, video_id=video_id, video_in=video_update)
         db.commit()
  
-        # 2. Extract frames
+        # 2. Frame extraction -- streamed (see iter_frames' docstring): the
+        # old extract_frames(..., in_memory=True) decoded and held every
+        # sampled frame of the whole video in memory before inference even
+        # started (10GB+ for a 1-minute 1080p video), which was the actual
+        # cause of video-upload OOM kills, not model size. total_frames
+        # here is a cheap metadata-only read for the progress percentage
+        # below, not the frames themselves.
         logger.info("Stage: Frame Extraction Started")
         try:
-            frames = extract_frames(video_path=db_video.filepath, video_id=video_id, frame_interval=1, in_memory=True)
-            logger.info("Stage: Frame Extraction Completed")
+            total_frames = get_frame_count(db_video.filepath) or 1
         except Exception as e:
-            logger.error(f"Core frame extraction failed for video {video_id}: {e}", exc_info=True)
+            logger.error(f"Could not read video metadata for {video_id}: {e}", exc_info=True)
             raise e
+        logger.info("Stage: Frame Extraction Completed")
  
         # Transition to Running AI Detection (Stage: Running AI Detection, Progress: 25%)
         video_update = UploadedVideoUpdate(
@@ -83,9 +89,12 @@ def process_video(video_id: int) -> None:
  
         from app.services.ai.tracker import RoadDistressTracker
         tracker = RoadDistressTracker(db)
-        total_frames = len(frames)
- 
-        for idx, frame_info in enumerate(frames):
+        processed_frame_count = 0
+
+        for idx, frame_info in enumerate(
+            iter_frames(video_path=db_video.filepath, video_id=video_id, frame_interval=1)
+        ):
+            processed_frame_count += 1
             frame_start_time = time.time()
             try:
                 detections = run_inference(
@@ -128,7 +137,7 @@ def process_video(video_id: int) -> None:
                 continue
  
         # If frame query completely failed when frames were extracted, mark core pipeline failed
-        if not has_inference_success and len(frames) > 0:
+        if not has_inference_success and processed_frame_count > 0:
             raise RuntimeError("Core AI inference failed to complete on all extracted frames.")
  
         logger.info("Stage: Inference Completed")

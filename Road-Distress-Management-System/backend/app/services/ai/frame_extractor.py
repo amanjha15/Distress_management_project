@@ -110,3 +110,74 @@ def extract_frames(video_path: str, video_id: int, frame_interval: int = 30, in_
         )
 
     return extracted_frames
+
+
+def get_frame_count(video_path: str) -> int:
+    """
+    Cheap metadata-only read (opens, reads one property, releases -- never
+    decodes an actual frame) for progress-percentage denominators. Not
+    treated as exact ground truth: container-reported frame counts are
+    sometimes inaccurate (e.g. variable-frame-rate recordings), same
+    caveat extract_frames()'s own early-stop warning documents.
+    """
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    full_video_path = os.path.join(base_dir, video_path)
+    if not os.path.exists(full_video_path):
+        full_video_path = video_path
+    cap = cv2.VideoCapture(full_video_path)
+    try:
+        return int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    finally:
+        cap.release()
+
+
+def iter_frames(video_path: str, video_id: int, frame_interval: int = 1):
+    """
+    Streaming counterpart to extract_frames(): yields one
+    {"frame_path": ndarray, "frame_number": int, "timestamp": float} dict
+    at a time instead of decoding and holding every sampled frame of the
+    whole video in memory simultaneously before returning. Every current
+    caller (pipeline_manager.process_video) only ever processes frames one
+    at a time in order, so this is a drop-in, detection-behavior-preserving
+    replacement for extract_frames(..., in_memory=True) -- same per-frame
+    dict shape, same sampling via frame_interval -- that caps peak memory
+    at roughly one frame's worth instead of O(video length). A 1-minute
+    1080p video at 30fps with frame_interval=1 is ~1800 frames; holding
+    them all as ~6MB arrays at once (the old behavior) is 10GB+, which is
+    what was actually OOM-killing video uploads, not model size.
+    """
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    full_video_path = os.path.join(base_dir, video_path)
+    if not os.path.exists(full_video_path):
+        full_video_path = video_path
+    if not os.path.exists(full_video_path):
+        raise FileNotFoundError(f"Video file not found at: {full_video_path}")
+
+    cap = cv2.VideoCapture(full_video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Could not open video file using OpenCV: {full_video_path}")
+
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps <= 0:
+        logger.warning(f"Invalid video FPS ({fps}) detected. Defaulting calculation to 30.0 FPS.")
+        fps = 30.0
+
+    frame_count = 0
+    yielded = 0
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if frame_count % frame_interval == 0:
+                yield {
+                    "frame_path": frame,
+                    "frame_number": frame_count,
+                    "timestamp": round(frame_count / fps, 3),
+                }
+                yielded += 1
+            frame_count += 1
+    finally:
+        cap.release()
+
+    logger.info(f"Streamed {yielded} frames from video {video_id} (Total read frames: {frame_count}).")
