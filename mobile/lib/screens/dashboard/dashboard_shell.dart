@@ -2,74 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../data/live_detection_api.dart' show kApiBaseUrl, setCustomServerUrl;
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/server_config_dialog.dart';
 import 'widgets/mobile_bottom_nav.dart';
 import 'widgets/mobile_drawer.dart';
 import 'widgets/sidebar.dart';
 import 'widgets/top_navbar.dart';
 
 void _showServerConfigDialog(BuildContext context) {
-  final controller = TextEditingController(text: kApiBaseUrl);
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: const Color(0xFF1E231C),
-      title: const Row(
-        children: [
-          Icon(LucideIcons.globe, color: AppColors.accentBlue, size: 20),
-          SizedBox(width: 8),
-          Text('Backend Connection URL', style: TextStyle(color: Colors.white, fontSize: 16)),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Enter your computer\'s Wi-Fi IP address (port 8000) or active tunnel URL to connect:',
-            style: TextStyle(color: Colors.white70, fontSize: 12),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: controller,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-            decoration: InputDecoration(
-              filled: true,
-              fillColor: Colors.black26,
-              hintText: 'e.g. http://192.168.1.42:8000',
-              hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentBlue),
-          onPressed: () {
-            if (controller.text.trim().isNotEmpty) {
-              setCustomServerUrl(controller.text);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Connecting to: ${controller.text.trim()}'),
-                  backgroundColor: AppColors.accentBlue,
-                ),
-              );
-              // Force refresh route
-              GoRouter.of(context).go(AppRoutes.videoReview);
-            }
-          },
-          child: const Text('Save & Connect', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    ),
+  showServerConfigDialog(
+    context,
+    onSaved: () => GoRouter.of(context).go(AppRoutes.videoReview),
   );
 }
 

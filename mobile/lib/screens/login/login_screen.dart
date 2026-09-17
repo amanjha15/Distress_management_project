@@ -9,6 +9,7 @@ import '../../data/auth_provider.dart';
 import '../../router/app_router.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/server_config_dialog.dart';
 
 enum _LoginStep { email, otp }
 
@@ -217,6 +218,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ),
             if (_isLoading) const _LoadingOverlay(),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: SafeArea(
+                child: IconButton(
+                  icon: const Icon(LucideIcons.globe, color: Colors.white70, size: 20),
+                  tooltip: 'Backend Connection Settings',
+                  onPressed: () => showServerConfigDialog(context),
+                ),
+              ),
+            ),
           ],
         ),
       ),
