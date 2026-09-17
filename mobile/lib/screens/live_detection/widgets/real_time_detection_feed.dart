@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../../../utils/local_time.dart';
+
 /// Mirrors RealTimeDetectionFeed.tsx's `FeedDetection` shape.
 class FeedDetection {
   const FeedDetection({
@@ -306,7 +308,7 @@ class _DetectionCard extends StatelessWidget {
                 ],
               ),
               Text(
-                '[${det.time}]',
+                '[${formatLocalTime(det.time)}]',
                 style: const TextStyle(
                   fontFamily: 'JetBrains Mono',
                   fontSize: 11.5,

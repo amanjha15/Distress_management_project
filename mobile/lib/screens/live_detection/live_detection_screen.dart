@@ -8,6 +8,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../data/live_detection_api.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/local_time.dart';
 import 'widgets/mjpeg_view.dart';
 import 'widgets/real_time_detection_feed.dart';
 
@@ -1255,7 +1256,7 @@ class _AlertItem extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '[${alert.time.length >= 19 ? alert.time.substring(11, 19) : alert.time}]',
+                      '[${formatLocalTime(alert.time)}]',
                       style: const TextStyle(
                         fontFamily: 'JetBrains Mono',
                         fontSize: 9,
@@ -1395,7 +1396,7 @@ class _DetectionHistoryCard extends StatelessWidget {
             ),
           ),
         ),
-        DataCell(Text(row.time.length >= 19 ? row.time.substring(11, 19) : row.time)),
+        DataCell(Text(formatLocalTime(row.time))),
         DataCell(Text(row.modelSource.toUpperCase())),
         DataCell(Text(row.className)),
         DataCell(

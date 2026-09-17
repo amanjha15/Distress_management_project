@@ -20,7 +20,7 @@ import random
 import logging
 import threading
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import cv2
@@ -342,7 +342,7 @@ class LiveCameraManager:
             return
 
         with self._lock:
-            self.stats["started_at"] = datetime.utcnow().isoformat()
+            self.stats["started_at"] = datetime.now(timezone.utc).isoformat()
 
         frame_count = 0
         t0 = time.time()
@@ -454,7 +454,7 @@ class LiveCameraManager:
                         self._event_seq += 1
                         self._events.append({
                             "seq": self._event_seq,
-                            "time": datetime.utcnow().isoformat(),
+                            "time": datetime.now(timezone.utc).isoformat(),
                             "class_name": det["class_name"],
                             "confidence": round(det["confidence"], 4),
                             "severity": severity,
@@ -516,7 +516,7 @@ class LiveCameraManager:
                     longitude=lon,
                     image_url=rel_path,
                     status="detected",
-                    detected_at=datetime.utcnow(),
+                    detected_at=datetime.now(timezone.utc),
                     frame_number=frame_number,
                     video_timestamp=round(elapsed, 3),
                     source_type="live",
