@@ -38,9 +38,12 @@ def generate_video_excel_report(db: Session, video_id: int) -> str:
 
     distresses = db.query(RoadDistress).filter(RoadDistress.video_id == video_id).all()
     
-    # Resolve directories
+    # Resolve directories. See pdf_generator.py's matching comment: these now
+    # live under backend/uploads/reports/ (inside the volume-backed uploads
+    # directory) instead of the sibling backend/../reports/, so a generated
+    # file survives a Railway redeploy.
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    generated_dir = os.path.join(base_dir, "reports", "excel")
+    generated_dir = os.path.join(base_dir, "backend", "uploads", "reports", "excel")
     os.makedirs(generated_dir, exist_ok=True)
     
     # Generate timestamp and filename

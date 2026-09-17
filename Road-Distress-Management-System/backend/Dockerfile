@@ -11,14 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # WORKDIR is one level deeper than usual (/app/backend, not /app) on
-# purpose: every path helper in this codebase computes its output directory
-# as N ".." hops up from its own __file__ -- uploads/ always lands inside
-# backend/, but reports/ (pdf_generator.py, excel_generator.py, and all 3
-# download routes in reports.py) consistently adds one extra ".." and lands
-# as a *sibling* of backend/, matching how it already behaves in local dev
-# (running uvicorn from backend/ still writes to ../reports). Using /app as
-# WORKDIR directly would silently resolve that sibling path to the
-# container's unmounted filesystem root instead of a mounted volume.
+# purpose: pdf_generator.py/excel_generator.py/reports.py's download routes
+# all resolve paths as N ".." hops up from their own __file__, up to a
+# shared base_dir (the parent of backend/). Using /app as WORKDIR directly
+# would shift every one of those hops by one level.
 WORKDIR /app/backend
 
 COPY requirements.txt .
@@ -48,10 +44,11 @@ RUN for f in road_best.pth signage_best.pth; do \
       fi; \
     done
 
-# uploads/ (raw + processed videos, detection crops) persists inside
-# backend/; reports/ (generated PDF/Excel) persists one level up -- both
-# mounted as volumes in docker-compose.yml, not baked into the image.
-RUN mkdir -p uploads ../reports
+# uploads/ (raw + processed videos, detection crops) and generated
+# PDF/Excel reports (uploads/reports/) both persist inside backend/,
+# mounted as one volume in docker-compose.yml (or one Railway Volume),
+# not baked into the image.
+RUN mkdir -p uploads/reports
 
 EXPOSE 8000
 

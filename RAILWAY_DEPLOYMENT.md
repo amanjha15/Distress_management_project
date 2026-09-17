@@ -48,11 +48,10 @@ schema migrations run automatically on startup (`main.py`'s `startup_event`
 
 **Settings → Volumes → New Volume** — mount at `/app/backend/uploads`.
 This is the important one: it's where raw/processed videos, detection
-crops, and the downloadable APK live — without it, everything uploaded is
-lost on every redeploy. Add a second volume at `/app/reports` too if your
-plan allows more than one; generated PDF/Excel reports are less critical
-since they're regenerated on download, so prioritize `uploads/` if you can
-only have one.
+crops, the downloadable APK, and generated PDF/Excel reports (under
+`uploads/reports/`) all live — without it, everything is lost on every
+redeploy. One volume covers all of it; Railway only allows one volume per
+service anyway.
 
 **Verify model weights actually deployed**: after the first build, open a
 shell on the service (Railway dashboard → service → the `>_` shell icon, or

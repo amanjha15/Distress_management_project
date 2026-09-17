@@ -51,9 +51,15 @@ def generate_video_pdf_report(db: Session, video_id: int) -> str:
 
     distresses = db.query(RoadDistress).filter(RoadDistress.video_id == video_id).all()
     
-    # Resolve directories
+    # Resolve directories. Generated files live under backend/uploads/reports/
+    # (not the sibling backend/../reports/ this used to write to) so they sit
+    # inside the same directory Railway's persistent volume is mounted at --
+    # a report generated there survives a redeploy instead of vanishing along
+    # with the container's ephemeral filesystem. base_dir itself (the parent
+    # of backend/) is unchanged, since reports.py's download routes resolve
+    # the stored relative filepath against that same base_dir.
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-    generated_dir = os.path.join(base_dir, "reports", "generated")
+    generated_dir = os.path.join(base_dir, "backend", "uploads", "reports", "generated")
     os.makedirs(generated_dir, exist_ok=True)
     
     # 2. Build report naming & filepath

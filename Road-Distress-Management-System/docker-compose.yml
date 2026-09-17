@@ -32,7 +32,9 @@ services:
     volumes:
       - ./backend/uploads:/app/backend/uploads
       - ./backend/models:/app/backend/models
-      - ./reports:/app/reports
+      # Generated PDF/Excel reports now live under backend/uploads/reports/
+      # (see pdf_generator.py/excel_generator.py) -- already covered by the
+      # uploads mount above, no separate mount needed.
 
   nginx:
     image: nginx:alpine
