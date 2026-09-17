@@ -11,7 +11,7 @@ import '../../theme/app_colors.dart';
 /// Project is selected, the user picks one of the four modules.
 /// M1 (Crack Detection) and M4 (Predictive Analysis) wire into the existing
 /// survey/analytics flows; M2 (Road Safety Audit) and M3 (Asset Management)
-/// are new modules not yet built.
+/// are new modules built from scratch on top of the Project container.
 class ModuleChooserScreen extends ConsumerWidget {
   const ModuleChooserScreen({super.key, required this.projectId});
 
@@ -110,8 +110,8 @@ class ModuleChooserScreen extends ConsumerWidget {
                               code: 'M3',
                               title: 'Asset Management',
                               subtitle: 'Project Management — document upload & attachments',
-                              available: false,
-                              onTap: () => _showComingSoon(context, 'Asset Management'),
+                              available: true,
+                              onTap: () => context.go(AppRoutes.assetList(projectId)),
                             ),
                             _ModuleTile(
                               icon: LucideIcons.lineChart,
@@ -132,12 +132,6 @@ class ModuleChooserScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String moduleName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$moduleName is not built yet — coming in a future update.')),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../data/auth_provider.dart';
+import '../screens/asset/asset_list_screen.dart';
 import '../screens/audit/audit_detail_screen.dart';
 import '../screens/audit/audit_list_screen.dart';
 import '../screens/dashboard/dashboard_shell.dart';
@@ -51,6 +52,7 @@ class AppRoutes {
   static String projectModules(int projectId) => '/projects/$projectId/modules';
   static String auditList(int projectId) => '/projects/$projectId/audits';
   static String auditDetail(int projectId, int auditId) => '/projects/$projectId/audits/$auditId';
+  static String assetList(int projectId) => '/projects/$projectId/assets';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -93,6 +95,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '${AppRoutes.projects}/:id/audits/:auditId',
         builder: (context, state) => AuditDetailScreen(
           auditId: int.tryParse(state.pathParameters['auditId'] ?? '') ?? 0,
+        ),
+      ),
+      GoRoute(
+        path: '${AppRoutes.projects}/:id/assets',
+        builder: (context, state) => AssetListScreen(
+          projectId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
         ),
       ),
       GoRoute(
