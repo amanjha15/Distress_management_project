@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libgl1 \
     libglib2.0-0 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # WORKDIR is one level deeper than usual (/app/backend, not /app) on
@@ -31,6 +32,21 @@ RUN pip install --no-cache-dir cmake ninja \
     && pip install --no-cache-dir yolox==0.3.0 --no-deps --no-build-isolation
 
 COPY . .
+
+# Some Git-connected build providers (confirmed: Railway) check out ~130-byte
+# git-lfs *pointer* files here instead of resolving the real ~200MB/70MB
+# checkpoints -- docker-compose sidesteps this via a runtime bind mount over
+# ./backend/models, but a provider with no such mount ships a backend that
+# can't load its own models. Redownload from a GitHub Release, but only when
+# what's on disk isn't already the real file (keeps this a no-op for
+# docker-compose, where the bind mount already has the genuine files).
+RUN for f in road_best.pth signage_best.pth; do \
+      size=$(stat -c%s "models/$f" 2>/dev/null || echo 0); \
+      if [ "$size" -lt 1000000 ]; then \
+        echo "models/$f is $size bytes (likely an unresolved git-lfs pointer) -- fetching the real file from GitHub Releases..." && \
+        curl -fsSL -o "models/$f" "https://github.com/amanjha15/Distress_management_project/releases/download/model-weights-v1/$f"; \
+      fi; \
+    done
 
 # uploads/ (raw + processed videos, detection crops) persists inside
 # backend/; reports/ (generated PDF/Excel) persists one level up -- both
