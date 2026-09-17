@@ -16,7 +16,9 @@ from app.api.v1.routes import (
     users,
     videos,
     detection,
-    live
+    live,
+    projects,
+    audits,
 )
 
 # Initialize FastAPI application
@@ -282,6 +284,8 @@ api_router.include_router(videos.router, prefix="/videos", tags=["Video Manageme
 api_router.include_router(upload.router, prefix="/upload", tags=["Media Upload & Processing"])
 api_router.include_router(detection.router, prefix="/detection", tags=["AI Distress Detection"])
 api_router.include_router(live.router, prefix="/live", tags=["Live Camera Detection"])
+api_router.include_router(projects.router, prefix="/projects", tags=["Projects (Module Platform)"])
+api_router.include_router(audits.router, prefix="/audits", tags=["M2 Road Safety Audit"])
 
 # Bind centralized API version 1 router to application
 app.include_router(api_router, prefix=settings.API_V1_STR)

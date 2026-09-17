@@ -98,6 +98,11 @@ desktop.ini
 # Docker
 docker-data/
 
+# Local caches / downloaded binaries (not source) -- e.g. the ffmpeg binary
+# transcription_service.py copies in for Whisper, and any local tunnel exe
+backend/.cache/
+backend/scripts/*.exe
+
 
 # Archives & media
 *.zip
