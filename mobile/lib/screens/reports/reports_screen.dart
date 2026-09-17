@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/maintenance_api.dart';
 import '../../data/reports_api.dart';
+import '../../data/road_distress_api.dart';
 import '../../data/video_api.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/download_helper.dart';
@@ -48,9 +49,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final _reportsApi = ReportsApi();
   final _videoApi = VideoApi();
   final _maintenanceApi = MaintenanceApi();
+  final _distressApi = RoadDistressApi();
 
   List<ReportItem> _reports = [];
   List<UploadedVideo> _videos = [];
+  List<DistressRecord> _distresses = [];
   bool _isLoading = true;
   String? _error;
 
@@ -117,14 +120,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _reportsApi.fetchReports(skip: 0, limit: 1000),
         _videoApi.fetchVideos(skip: 0, limit: 200),
         _maintenanceApi.fetchUsers(skip: 0, limit: 200),
+        _distressApi.fetchDistresses(skip: 0, limit: 1000),
       ]);
       final records = results[0] as List<ReportRecord>;
       final videos = results[1] as List<UploadedVideo>;
       final users = results[2] as List<AppUser>;
+      final distresses = results[3] as List<DistressRecord>;
       if (!mounted) return;
       setState(() {
         _videos = videos;
-        _reports = records.map((r) => ReportItem.fromRecord(r, videos: videos, users: users)).toList();
+        _distresses = distresses;
+        _reports = records
+            .map((r) => ReportItem.fromRecord(r, videos: videos, users: users, distresses: distresses))
+            .toList();
         _error = null;
         _isLoading = false;
       });
@@ -252,7 +260,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     setState(() => _isCompiling = true);
     try {
       final rec = await _reportsApi.generatePdfReport(videoId);
-      final newItem = ReportItem.fromGenerated(rec, videoId: videoId, videos: _videos, reportType: 'PDF');
+      final newItem = ReportItem.fromGenerated(
+        rec,
+        videoId: videoId,
+        videos: _videos,
+        distresses: _distresses,
+        reportType: 'PDF',
+      );
       if (!mounted) return;
       setState(() {
         _reports = [newItem, ..._reports];
@@ -274,7 +288,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
     setState(() => _isCompilingExcel = true);
     try {
       final rec = await _reportsApi.generateExcelReport(videoId);
-      final newItem = ReportItem.fromGenerated(rec, videoId: videoId, videos: _videos, reportType: 'EXCEL');
+      final newItem = ReportItem.fromGenerated(
+        rec,
+        videoId: videoId,
+        videos: _videos,
+        distresses: _distresses,
+        reportType: 'EXCEL',
+      );
       if (!mounted) return;
       setState(() {
         _reports = [newItem, ..._reports];

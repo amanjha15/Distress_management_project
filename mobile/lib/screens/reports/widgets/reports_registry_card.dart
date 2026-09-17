@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../../data/reports_api.dart';
 import '../../../theme/app_colors.dart';
+import '../../history/widgets/activity_timeline.dart' show formatDateTimeIN;
 
 /// Direct port of ReportsDashboard.tsx's "Generated Reports Registry" card:
 /// the sync-refresh header, the search/format/severity/status/date-range/
@@ -298,7 +299,7 @@ class ReportsRegistryCard extends StatelessWidget {
           decoration: BoxDecoration(color: severityColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(9999)),
           child: Text(r.severity, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: severityColor)),
         )),
-        DataCell(Text(r.generatedDate, style: const TextStyle(fontSize: 12, color: AppColors.secondaryText))),
+        DataCell(Text(formatDateTimeIN(r.generatedAt), style: const TextStyle(fontSize: 12, color: AppColors.secondaryText))),
         DataCell(Text(r.reportType, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.accentBlue, fontFamily: 'monospace'))),
         DataCell(Text(r.size, style: const TextStyle(fontSize: 11, color: AppColors.secondaryText, fontFamily: 'monospace'))),
         DataCell(Row(

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'custom_http_client.dart';
 import 'live_detection_api.dart' show kApiV1;
 import 'maintenance_api.dart' show AppUser;
+import 'road_distress_api.dart' show DistressRecord;
 import 'video_api.dart' show UploadedVideo;
 
 /// Direct Dart port of `ReportResponse` in apiService.ts.
@@ -41,8 +42,6 @@ class ReportRecord {
 }
 
 const _kDistricts = ['Mumbai', 'Pune', 'Nagpur', 'Thane', 'Satara'];
-const _kDistressTypes = ['Pothole', 'Alligator Cracks', 'Rutting', 'Edge Break', 'Patch'];
-const _kSeverities = ['Critical', 'High', 'Medium', 'Low'];
 
 /// Direct port of ReportsDashboard.tsx's `SEVERITY_COLORS`.
 const kReportSeverityColors = {
@@ -52,14 +51,50 @@ const kReportSeverityColors = {
   'Low': 0xFF3B82F6,
 };
 
+const _kSeverityRank = {'critical': 4, 'high': 3, 'medium': 2, 'low': 1};
+
+String _prettifyDistressType(String raw) {
+  final words = raw.replaceAll('_', ' ').trim().split(RegExp(r'\s+'));
+  return words.map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1).toLowerCase()).join(' ');
+}
+
+String _prettifySeverity(String raw) => raw.isEmpty ? raw : raw[0].toUpperCase() + raw.substring(1).toLowerCase();
+
+/// Picks the most severe real distress record for [videoId] (as opposed to
+/// the old videoId-modulo fake placeholder every ReportItem used to show
+/// regardless of what was actually detected) so the "Distress class"
+/// column reflects the report's actual content. Falls back to a neutral
+/// placeholder only if the video genuinely has no distress records.
+({String distressType, String severity}) _principalDistressFor(
+  int videoId,
+  List<DistressRecord> distresses,
+) {
+  final forVideo = distresses.where((d) => d.videoId == videoId).toList()
+    ..sort((a, b) =>
+        (_kSeverityRank[b.severity.toLowerCase()] ?? 0).compareTo(_kSeverityRank[a.severity.toLowerCase()] ?? 0));
+  if (forVideo.isEmpty) {
+    return (distressType: 'No distress data', severity: 'Low');
+  }
+  final principal = forVideo.first;
+  return (
+    distressType: _prettifyDistressType(principal.distressType),
+    severity: _prettifySeverity(principal.severity),
+  );
+}
+
 /// Direct Dart port of ReportsDashboard.tsx's `ReportItem`, joined
-/// client-side from a [ReportRecord] plus the uploaded-videos and users
-/// lists exactly as `loadDashboardData` does -- there's no backend endpoint
-/// that returns this joined shape directly. `roadId`/`district`/
-/// `distressType`/`severity` are faithfully-preserved fake-but-deterministic
-/// values derived from `videoId % <lookup array>.length`, matching the React
-/// source's own placeholder logic (there's no real per-report geo/distress
-/// data on the backend to join against).
+/// client-side from a [ReportRecord] plus the uploaded-videos, users, and
+/// distresses lists exactly as `loadDashboardData` does -- there's no
+/// backend endpoint that returns this joined shape directly. `roadId` and
+/// `district` are still faithfully-preserved fake-but-deterministic values
+/// derived from `videoId % <lookup array>.length` (matching the React
+/// source's own placeholder logic; there's no real district/geo data on
+/// the backend to join against). `distressType`/`severity`, however, are
+/// real -- computed from that video's actual RoadDistress records via
+/// [_principalDistressFor], not the source's placeholder logic, since
+/// showing a fake class/severity for a real generated report was actively
+/// misleading (every report for the same video always showed the same
+/// value regardless of what was actually detected).
 ///
 /// The source's `reportId` is optional because its fake "Generate Custom
 /// Report" feature fabricates a `ReportItem` with no backing DB row. That
@@ -77,6 +112,7 @@ class ReportItem {
     required this.distressType,
     required this.severity,
     required this.generatedDate,
+    required this.generatedAt,
     required this.status,
     required this.reportType,
     required this.size,
@@ -92,6 +128,11 @@ class ReportItem {
   final String distressType;
   final String severity;
   final String generatedDate;
+
+  /// Full timestamp (not just the date) for display -- see
+  /// reports_registry_card.dart's "Generated Date" column, which uses
+  /// formatDateTimeIN (.toLocal()-aware) on this instead of [generatedDate].
+  final DateTime generatedAt;
   final String status;
   final String? filepath;
   final int reportId;
@@ -106,6 +147,7 @@ class ReportItem {
     ReportRecord rec, {
     required List<UploadedVideo> videos,
     required List<AppUser> users,
+    required List<DistressRecord> distresses,
   }) {
     final match = _videoIdPattern.firstMatch(rec.reportName);
     var roadId = 'NH-48';
@@ -126,8 +168,9 @@ class ReportItem {
       if (associated != null) {
         roadId = 'Road-${associated.id}';
         district = _kDistricts[vidId % _kDistricts.length];
-        distressType = _kDistressTypes[vidId % _kDistressTypes.length];
-        severity = _kSeverities[vidId % _kSeverities.length];
+        final principal = _principalDistressFor(vidId, distresses);
+        distressType = principal.distressType;
+        severity = principal.severity;
       }
       downloadCount = vidId * 3 + 4;
     }
@@ -140,13 +183,15 @@ class ReportItem {
       }
     }
 
+    final generatedAtStr = rec.generatedAt ?? rec.createdAt;
     return ReportItem(
       id: rec.reportName,
       roadId: roadId,
       district: district,
       distressType: distressType,
       severity: severity,
-      generatedDate: (rec.generatedAt ?? rec.createdAt).split('T').first,
+      generatedDate: generatedAtStr.split('T').first,
+      generatedAt: DateTime.tryParse(generatedAtStr) ?? DateTime.now(),
       status: rec.filepath != null ? 'Exported' : 'Approved',
       filepath: rec.filepath,
       reportId: rec.id,
@@ -167,6 +212,7 @@ class ReportItem {
     ReportRecord rec, {
     required int videoId,
     required List<UploadedVideo> videos,
+    required List<DistressRecord> distresses,
     required String reportType,
   }) {
     UploadedVideo? associated;
@@ -177,13 +223,16 @@ class ReportItem {
       }
     }
     final roadId = associated != null ? 'Road-${associated.id}' : 'Road-$videoId';
+    final principal = _principalDistressFor(videoId, distresses);
+    final generatedAtStr = rec.generatedAt ?? rec.createdAt;
     return ReportItem(
       id: rec.reportName,
       roadId: roadId,
       district: _kDistricts[videoId % _kDistricts.length],
-      distressType: _kDistressTypes[videoId % _kDistressTypes.length],
-      severity: _kSeverities[videoId % _kSeverities.length],
-      generatedDate: (rec.generatedAt ?? rec.createdAt).split('T').first,
+      distressType: principal.distressType,
+      severity: principal.severity,
+      generatedDate: generatedAtStr.split('T').first,
+      generatedAt: DateTime.tryParse(generatedAtStr) ?? DateTime.now(),
       status: rec.filepath != null ? 'Exported' : 'Approved',
       filepath: rec.filepath,
       reportId: rec.id,
