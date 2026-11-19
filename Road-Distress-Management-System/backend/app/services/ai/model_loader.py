@@ -53,6 +53,12 @@ YOLOX_NMS_THRESH = 0.45
 # accuracy ceiling on this kind of footage, not something a threshold can hide.
 YOLOX_CONF_THRESH = 0.6
 
+# The road model (own6, fine-tuned on our own dashcam frames from the original
+# RDD2022 model) is calibrated lower than the original: on held-out frames, at 0.35
+# it finds ~35% of labelled damage and flags ~12% of clean frames; at 0.6 it would
+# find almost nothing. Signage keeps YOLOX_CONF_THRESH. Override with ROAD_CONF_THRESH.
+YOLOX_ROAD_CONF_THRESH = float(os.getenv("ROAD_CONF_THRESH", "0.35"))
+
 
 class MockBoxItem:
     """
@@ -248,7 +254,7 @@ class ModelLoader:
                     exp_file="",
                     ckpt_file="",
                     model_source="road",
-                    conf_thresh=YOLOX_CONF_THRESH,
+                    conf_thresh=YOLOX_ROAD_CONF_THRESH,
                     nms_thresh=YOLOX_NMS_THRESH,
                     # Matches the model's actual training resolution (pavement_yolox_m_exp.py:
                     # input_size=test_size=(640,640)) -- unlike the live camera pipeline
